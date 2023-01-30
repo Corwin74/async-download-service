@@ -8,11 +8,14 @@ async def archive(request):
     response = web.StreamResponse()
     archive_hash = request.match_info.get('archive_hash')
 
+    target_directory = f'{working_directory}/test_photos/{archive_hash}/'
+    if not os.path.exists(target_directory):
+        raise web.HTTPNotFound(text='Архив не существует или был удален')
+
     response.headers['Content-Type'] = 'application/octet-stream'
     response.headers['Content-Disposition'] = \
         'attachment; filename="photo_archive.zip"'
 
-    # Отправляет клиенту HTTP заголовки
     await response.prepare(request)
 
     proc = await asyncio.create_subprocess_exec(
@@ -21,7 +24,7 @@ async def archive(request):
         '-',
         '.',
         stdout=asyncio.subprocess.PIPE,
-        cwd=f'{working_directory}/test_photos/{archive_hash}/'
+        cwd=target_directory,
     )
 
     while True:

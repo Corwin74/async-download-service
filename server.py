@@ -1,7 +1,11 @@
 import asyncio
+import logging
 import os
 from aiohttp import web
 import aiofiles
+
+logger = logging.getLogger(__file__)
+working_directory = os.path.dirname(os.path.abspath(__file__))
 
 
 async def archive(request):
@@ -20,7 +24,7 @@ async def archive(request):
 
     proc = await asyncio.create_subprocess_exec(
         'zip',
-        '-r',
+        '-rq',
         '-',
         '.',
         stdout=asyncio.subprocess.PIPE,
@@ -31,6 +35,7 @@ async def archive(request):
         if proc.stdout.at_eof():
             break
         data = await proc.stdout.read(1024*400)
+        logger.info('Sending archive chunk %s bytes to lenght', len(data))
         await response.write(data)
 
     await response.write_eof()
@@ -44,12 +49,20 @@ async def handle_index_page(request):
     return web.Response(text=index_contents, content_type='text/html')
 
 
-if __name__ == '__main__':
-    working_directory = os.path.dirname(os.path.abspath(__file__))
-    print(f'Working directory: {working_directory}')
+def main():
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO
+    )
+    logger.setLevel(logging.INFO)
+    logger.info('Working directory: %s', working_directory)
     app = web.Application()
     app.add_routes([
         web.get('/', handle_index_page),
         web.get('/archive/{archive_hash}/', archive),
     ])
     web.run_app(app)
+
+
+if __name__ == '__main__':
+    main()

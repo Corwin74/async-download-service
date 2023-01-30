@@ -1,30 +1,38 @@
+import asyncio
+import os
 from aiohttp import web
 import aiofiles
-import asyncio
-import datetime
-
-INTERVAL_SECS = 1
 
 
 async def archive(request):
-
     response = web.StreamResponse()
+    archive_hash = request.match_info.get('archive_hash')
 
-    # Большинство браузеров не отрисовывают частично загруженный контент, только если это не HTML.
-    # Поэтому отправляем клиенту именно HTML, указываем это в Content-Type.
-    response.headers['Content-Type'] = 'text/html'
+    response.headers['Content-Type'] = 'application/octet-stream'
+    response.headers['Content-Disposition'] = \
+        'attachment; filename="photo_archive.zip"'
 
     # Отправляет клиенту HTTP заголовки
     await response.prepare(request)
 
+    proc = await asyncio.create_subprocess_exec(
+        'zip',
+        '-r',
+        '-',
+        '.',
+        stdout=asyncio.subprocess.PIPE,
+        cwd=f'{working_directory}/test_photos/{archive_hash}/'
+    )
+
     while True:
-        formatted_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        message = f'{formatted_date}<br>'  # <br> — HTML тег переноса строки
+        if proc.stdout.at_eof():
+            break
+        data = await proc.stdout.read(1024*400)
+        await response.write(data)
 
-        # Отправляет клиенту очередную порцию ответа
-        await response.write(message.encode('utf-8'))
-
-        await asyncio.sleep(INTERVAL_SECS)
+    await response.write_eof()
+    await proc.wait()
+    return response
 
 
 async def handle_index_page(request):
@@ -34,6 +42,8 @@ async def handle_index_page(request):
 
 
 if __name__ == '__main__':
+    working_directory = os.path.dirname(os.path.abspath(__file__))
+    print(f'Working directory: {working_directory}')
     app = web.Application()
     app.add_routes([
         web.get('/', handle_index_page),

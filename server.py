@@ -30,13 +30,26 @@ async def archive(request):
         stdout=asyncio.subprocess.PIPE,
         cwd=target_directory,
     )
-
-    while True:
-        if proc.stdout.at_eof():
-            break
-        data = await proc.stdout.read(1024*400)
-        logger.info('Sending archive chunk %s bytes to lenght', len(data))
-        await response.write(data)
+    i = 0
+    try:
+        while True:
+            if proc.stdout.at_eof():
+                break
+            if i == 2:
+                raise ZeroDivisionError('Караул!')
+            data = await proc.stdout.read(1024*400)
+            logger.info('Sending archive chunk %s bytes to lenght', len(data))
+            try:
+                await response.write(data)
+            except ConnectionResetError:
+                logger.error('Download was interrupted')
+                proc.terminate()
+                return response
+            await asyncio.sleep(5)
+    except (SystemExit, ZeroDivisionError):
+        logger.error('Download was interrupted')
+        proc.terminate()
+        return response
 
     await response.write_eof()
     await proc.wait()

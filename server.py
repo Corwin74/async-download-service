@@ -3,13 +3,16 @@ import logging
 import os
 from aiohttp import web
 import aiofiles
+import aiohttp_debugtoolbar
 
 logger = logging.getLogger(__file__)
 working_directory = os.path.dirname(os.path.abspath(__file__))
 
 
 async def archive(request):
+    print(await request.text())
     response = web.StreamResponse()
+    response.enable_chunked_encoding()
     archive_hash = request.match_info.get('archive_hash')
 
     target_directory = f'{working_directory}/test_photos/{archive_hash}/'
@@ -39,18 +42,16 @@ async def archive(request):
                 raise ZeroDivisionError('Караул!')
             data = await proc.stdout.read(1024*400)
             logger.info('Sending archive chunk %s bytes to lenght', len(data))
-            try:
-                await response.write(data)
-            except ConnectionResetError:
-                logger.error('Download was interrupted')
-                proc.terminate()
-                return response
+            await response.write(data)
             await asyncio.sleep(5)
+    except ConnectionResetError:        
+        logger.info('Download was interrupted')
+    except asyncio.CancelledError:
+        logger.info('cancelled error exception')
     except (SystemExit, ZeroDivisionError):
         logger.error('Download was interrupted')
+    finally:
         proc.terminate()
-        return response
-
     await response.write_eof()
     await proc.wait()
     return response
@@ -70,6 +71,7 @@ def main():
     logger.setLevel(logging.INFO)
     logger.info('Working directory: %s', working_directory)
     app = web.Application()
+    aiohttp_debugtoolbar.setup(app)
     app.add_routes([
         web.get('/', handle_index_page),
         web.get('/archive/{archive_hash}/', archive),

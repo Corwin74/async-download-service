@@ -10,13 +10,16 @@ working_directory = os.path.dirname(os.path.abspath(__file__))
 
 
 async def archive(request):
-    print(await request.text())
     response = web.StreamResponse()
     response.enable_chunked_encoding()
     archive_hash = request.match_info.get('archive_hash')
 
     target_directory = f'{working_directory}/test_photos/{archive_hash}/'
     if not os.path.exists(target_directory):
+        logging.error(
+            "Cannot access '%s': No such directory",
+            target_directory
+        )
         raise web.HTTPNotFound(text='Архив не существует или был удален')
 
     response.headers['Content-Type'] = 'application/octet-stream'
@@ -37,24 +40,29 @@ async def archive(request):
     try:
         while True:
             if proc.stdout.at_eof():
+                await response.write_eof()
+                print('All Zip! Send eof')
                 break
             if i == 2:
                 raise ZeroDivisionError('Караул!')
             data = await proc.stdout.read(1024*400)
-            logger.info('Sending archive chunk %s bytes to lenght', len(data))
+            logger.info('Sending archive chunk %s bytes to length', len(data))
             await response.write(data)
-            await asyncio.sleep(5)
-    except ConnectionResetError:        
+            await asyncio.sleep(1)
+    except ConnectionResetError:
         logger.info('Download was interrupted')
+        proc.terminate()
     except asyncio.CancelledError:
         logger.info('cancelled error exception')
     except (SystemExit, ZeroDivisionError):
         logger.error('Download was interrupted')
-    finally:
-        proc.terminate()
-    await response.write_eof()
+    else:
+        print('All good!')
+        return response
+    print('end_loop')
     await proc.wait()
-    return response
+    print('proc.wait()')
+    raise web.HTTPBadRequest()
 
 
 async def handle_index_page(request):

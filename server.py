@@ -48,21 +48,22 @@ async def archive(request):
             data = await proc.stdout.read(1024*400)
             logger.info('Sending archive chunk %s bytes to length', len(data))
             await response.write(data)
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.3)
     except ConnectionResetError:
         logger.info('Download was interrupted')
-        proc.terminate()
     except asyncio.CancelledError:
-        logger.info('cancelled error exception')
+        logger.info('Cancelled error exception')
     except (SystemExit, ZeroDivisionError):
-        logger.error('Download was interrupted')
+        logger.error('System Exit exception')
     else:
-        print('All good!')
+        logging.info('Archive has been sent')
         return response
     print('end_loop')
-    await proc.wait()
-    print('proc.wait()')
-    raise web.HTTPBadRequest()
+    proc.terminate()
+    logging.info('Terminating...')
+    await proc.communicate()
+    logging.info('Zip process has been terminated')
+    raise web.HTTPBadRequest(text='Drop connection')
 
 
 async def handle_index_page(request):
@@ -71,21 +72,31 @@ async def handle_index_page(request):
     return web.Response(text=index_contents, content_type='text/html')
 
 
-def main():
+async def main():
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
     logger.setLevel(logging.INFO)
     logger.info('Working directory: %s', working_directory)
+    # add stuff to the loop, e.g. using asyncio.create_task()
+    # ...
     app = web.Application()
     aiohttp_debugtoolbar.setup(app)
     app.add_routes([
         web.get('/', handle_index_page),
         web.get('/archive/{archive_hash}/', archive),
     ])
-    web.run_app(app)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner)
+    await site.start()
+
+    # add more stuff to the loop, if needed
+    # ..
+    # wait forever
+    await asyncio.Event().wait()
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())

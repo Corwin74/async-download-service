@@ -37,14 +37,20 @@ async def archive(request):
         stdout=asyncio.subprocess.PIPE,
         cwd=target_directory,
     )
+    request.app['run_procs'][proc.pid] = True
     i = 0
     j = []
     try:
         while True:
-            if proc.stdout.at_eof():
+            print(proc.stdout.at_eof())
+            print(proc.returncode)
+            if proc.stdout.at_eof() and proc.returncode == 0:
                 await response.write_eof()
                 print('All Zip! Send eof')
                 break
+            if proc.stdout.at_eof():
+                logging.info('Eof bad')
+                raise ConnectionResetError
             if i == 2:
                 #0/0
                 j[3] = 3
@@ -53,7 +59,7 @@ async def archive(request):
             logger.info('Sending archive chunk %s bytes to length', len(data))
             await response.write(data)
             await asyncio.sleep(1)
-            i += 1
+            #i += 1
     except ConnectionResetError:
         logger.info('Download was interrupted')
     except asyncio.CancelledError:
@@ -62,8 +68,10 @@ async def archive(request):
         logger.error('System Exit exception')
     else:
         logging.info('Archive has been sent')
+        request.app['run_procs'].pop(proc.pid, None)
         return response
     finally:
+        print(f"Proc: {request.app['run_procs']}")
         if proc.returncode is None:
             proc.terminate()
             logging.info('Terminating...')
@@ -78,6 +86,11 @@ async def handle_index_page(request):
     return web.Response(text=index_contents, content_type='text/html')
 
 
+async def on_shutdown(app):
+    print('Shutdown Aaaaaaaaaaaaa')
+    print(app['run_procs'])
+
+
 def main():
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -88,11 +101,13 @@ def main():
     # add stuff to the loop, e.g. using asyncio.create_task()
     # ...
     app = web.Application()
+    app['run_procs'] = {}
     aiohttp_debugtoolbar.setup(app)
     app.add_routes([
         web.get('/', handle_index_page),
         web.get('/archive/{archive_hash}/', archive),
     ])
+    app.on_shutdown.append(on_shutdown)
     web.run_app(app)
 
 

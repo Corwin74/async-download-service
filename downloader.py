@@ -11,7 +11,7 @@ async def main():
                 is_delay_done = False
                 async for chunk in resp.content.iter_any():
                     print(len(chunk))
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(10)
                     if i > 2 and not is_delay_done:
                         print('Pause....')
                         print(datetime.datetime.now())

@@ -5,6 +5,7 @@ from aiohttp import web
 import aiofiles
 import aiohttp_debugtoolbar
 
+
 logger = logging.getLogger(__file__)
 working_directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -37,6 +38,7 @@ async def archive(request):
         cwd=target_directory,
     )
     i = 0
+    j = []
     try:
         while True:
             if proc.stdout.at_eof():
@@ -44,26 +46,30 @@ async def archive(request):
                 print('All Zip! Send eof')
                 break
             if i == 2:
-                raise ZeroDivisionError('Караул!')
+                #0/0
+                j[3] = 3
+                #raise ZeroDivisionError('Караул!')
             data = await proc.stdout.read(1024*400)
             logger.info('Sending archive chunk %s bytes to length', len(data))
             await response.write(data)
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(1)
+            i += 1
     except ConnectionResetError:
         logger.info('Download was interrupted')
     except asyncio.CancelledError:
         logger.info('Cancelled error exception')
-    except (SystemExit, ZeroDivisionError):
+    except SystemExit:
         logger.error('System Exit exception')
     else:
         logging.info('Archive has been sent')
         return response
-    print('end_loop')
-    proc.terminate()
-    logging.info('Terminating...')
-    await proc.communicate()
-    logging.info('Zip process has been terminated')
-    raise web.HTTPBadRequest(text='Drop connection')
+    finally:
+        if proc.returncode is None:
+            proc.terminate()
+            logging.info('Terminating...')
+            await proc.communicate()
+            logging.info('Zip process has been terminated')
+            raise web.HTTPBadRequest(text='Drop connection')
 
 
 async def handle_index_page(request):
@@ -72,7 +78,7 @@ async def handle_index_page(request):
     return web.Response(text=index_contents, content_type='text/html')
 
 
-async def main():
+def main():
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
@@ -87,16 +93,8 @@ async def main():
         web.get('/', handle_index_page),
         web.get('/archive/{archive_hash}/', archive),
     ])
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner)
-    await site.start()
-
-    # add more stuff to the loop, if needed
-    # ..
-    # wait forever
-    await asyncio.Event().wait()
+    web.run_app(app)
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()

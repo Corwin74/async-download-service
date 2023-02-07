@@ -69,7 +69,7 @@ async def archive(request):
             raise web.HTTPBadRequest(text='Drop connection')
 
 
-async def handle_index_page(request):
+async def handle_index_page(_):
     async with aiofiles.open('index.html', mode='r') as index_file:
         index_contents = await index_file.read()
     return web.Response(text=index_contents, content_type='text/html')

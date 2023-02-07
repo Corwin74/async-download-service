@@ -1,12 +1,13 @@
 import asyncio
-import aiohttp
 import datetime
+import argparse
+import aiohttp
 
 
-async def main():
+async def main(parsed_args):
     async with aiohttp.ClientSession() as session:
-        async with session.get('http://0.0.0.0:8080/archive/rur2/') as resp:
-            with open('archive.zip', 'wb') as file_descriptor:
+        async with session.get(parsed_args.url) as resp:
+            with open(parsed_args.filename, 'wb') as file_descriptor:
                 i = 0
                 is_delay_done = False
                 async for chunk in resp.content.iter_any():
@@ -22,4 +23,9 @@ async def main():
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description='Downloader')
+    parser.add_argument('url', default=None)
+    parser.add_argument('--filename', default='archive.zip', required=False)
+    parsed_args = parser.parse_args()
+    print(parsed_args.url)
+    asyncio.run(main(parsed_args))

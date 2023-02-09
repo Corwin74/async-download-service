@@ -7,9 +7,6 @@ import aiofiles
 
 
 logger = logging.getLogger(__file__)
-working_directory = os.path.dirname(os.path.abspath(__file__))
-latency = 1
-photo_directory = '/test_photos/'
 
 
 async def archive(request):
@@ -17,8 +14,8 @@ async def archive(request):
     response.enable_chunked_encoding()
     archive_hash = request.match_info.get('archive_hash')
 
-    target_directory = working_directory + photo_directory + archive_hash
-    print(f'{target_directory= }')
+    target_directory = request.app['working_directory'] + '/' + archive_hash
+    print(target_directory)
     if not os.path.exists(target_directory):
         logging.error(
             "Cannot access '%s': No such directory",
@@ -55,7 +52,8 @@ async def archive(request):
             data = await proc.stdout.read(1024*400)
             logger.debug('Sending archive chunk %s bytes to length', len(data))
             await response.write(data)
-            await asyncio.sleep(latency)
+            await asyncio.sleep(request.app['latency'])
+            print(request.app['latency'])
     except ConnectionResetError:
         logger.info('Download was interrupted')
     except SystemExit:
@@ -79,17 +77,13 @@ async def handle_index_page(_):
 
 
 def main():
-    global latency, photo_directory
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--directory', type=str)
-    parser.add_argument('-l', '--latency', type=float, default=0)
+    parser.add_argument('-d', '--directory', type=str, default='test_photos/')
+    parser.add_argument('-l', '--latency', type=float, default=1)
     parser.add_argument("-v", "--verbose", nargs='?',
                         const=True, default=False,
                         help="Activate debug mode.")
     parsed_args = parser.parse_args()
-    latency = parsed_args.latency
-    if parsed_args.directory:
-        photo_directory = parsed_args.directory
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO,
@@ -97,8 +91,20 @@ def main():
     )
     if parsed_args.verbose:
         logger.setLevel(logging.DEBUG)
+    working_directory = os.path.dirname(os.path.abspath(__file__))
+    if parsed_args.directory[0] == '/':
+        working_directory = parsed_args.directory
+    else:
+        working_directory += '/' + parsed_args.directory
+    if working_directory[-1] == '/':
+        working_directory = working_directory[:-1]
+    if not os.path.exists(working_directory):
+        logger.error("%s not exist", working_directory)
+        return
     logger.info('Working directory: %s', working_directory)
     app = web.Application()
+    app['latency'] = parsed_args.latency
+    app['working_directory'] = parsed_args.directory
     app.add_routes([
         web.get('/', handle_index_page),
         web.get('/archive/{archive_hash}/', archive),

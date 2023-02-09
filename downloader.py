@@ -16,7 +16,10 @@ async def download(url, filename, pause_at=None, latency=0, delay=None):
                     iteration_counter = 0
                     async for chunk in resp.content.iter_any():
                         logger.debug('Iteration #%s', iteration_counter)
-                        logger.debug('Receive chunk %s bytes length', len(chunk))
+                        logger.debug(
+                            'Receive chunk %s bytes length',
+                            len(chunk)
+                        )
                         await asyncio.sleep(latency)
                         if iteration_counter == pause_at and delay:
                             logger.info('Pause for %s seconds', delay)
@@ -43,7 +46,7 @@ def main():
     )
     parser.add_argument('-d', '--delay', type=int)
     parser.add_argument('-p', '--pause_at', type=int, default=3)
-    parser.add_argument('-l', '--latency', type=float, default=0)
+    parser.add_argument('-l', '--latency', type=float, default=0.5)
     parser.add_argument("-v", "--verbose", nargs='?',
                         const=True, default=False,
                         help="Activate debug mode.")

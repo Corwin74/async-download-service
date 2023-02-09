@@ -10,19 +10,22 @@ logger = logging.getLogger(__file__)
 async def download(url, filename, pause_at=None, latency=0, delay=None):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
-            with open(filename, 'wb') as file_descriptor:
-                logger.info('Start downloading...')
-                iteration_counter = 0
-                async for chunk in resp.content.iter_any():
-                    logger.debug('Iteration #%s', iteration_counter)
-                    logger.debug('Receive chunk %s bytes length', len(chunk))
-                    await asyncio.sleep(latency)
-                    if iteration_counter == pause_at and delay:
-                        logger.info('Pause for %s seconds', delay)
-                        await asyncio.sleep(delay)
-                    file_descriptor.write(chunk)
-                    iteration_counter += 1
-            logger.info('Download save to %s', filename)
+            if resp.status == 200:
+                with open(filename, 'wb') as file_descriptor:
+                    logger.info('Start downloading...')
+                    iteration_counter = 0
+                    async for chunk in resp.content.iter_any():
+                        logger.debug('Iteration #%s', iteration_counter)
+                        logger.debug('Receive chunk %s bytes length', len(chunk))
+                        await asyncio.sleep(latency)
+                        if iteration_counter == pause_at and delay:
+                            logger.info('Pause for %s seconds', delay)
+                            await asyncio.sleep(delay)
+                        file_descriptor.write(chunk)
+                        iteration_counter += 1
+                logger.info('Download save to %s', filename)
+            else:
+                logger.error(await resp.text())
 
 
 def main():

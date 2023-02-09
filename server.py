@@ -1,13 +1,15 @@
 import asyncio
 import logging
 import os
+import argparse
 from aiohttp import web
 import aiofiles
-import aiohttp_debugtoolbar
 
 
 logger = logging.getLogger(__file__)
 working_directory = os.path.dirname(os.path.abspath(__file__))
+latency = 1
+photo_directory = '/test_photos/'
 
 
 async def archive(request):
@@ -15,7 +17,8 @@ async def archive(request):
     response.enable_chunked_encoding()
     archive_hash = request.match_info.get('archive_hash')
 
-    target_directory = f'{working_directory}/test_photos/{archive_hash}/'
+    target_directory = working_directory + photo_directory + archive_hash
+    print(f'{target_directory= }')
     if not os.path.exists(target_directory):
         logging.error(
             "Cannot access '%s': No such directory",
@@ -41,10 +44,10 @@ async def archive(request):
         while True:
             if proc.stdout.at_eof() and proc.returncode == 0:
                 await response.write_eof()
-                logging.info('Zip OK')
+                logger.debug('Zip process exit status is OK')
                 break
             if proc.stdout.at_eof():
-                logging.info(
+                logger.debug(
                     'Receive eof, but zip process returncode: %s',
                     proc.returncode
                 )
@@ -52,20 +55,20 @@ async def archive(request):
             data = await proc.stdout.read(1024*400)
             logger.debug('Sending archive chunk %s bytes to length', len(data))
             await response.write(data)
-            await asyncio.sleep(1)
+            await asyncio.sleep(latency)
     except ConnectionResetError:
         logger.info('Download was interrupted')
     except SystemExit:
         logger.error('System Exit exception')
     else:
-        logging.info('Archive has been sent')
+        logger.info('Archive has been sent')
         return response
     finally:
         if proc.returncode is None:
             proc.terminate()
-            logging.info('Terminating zip process...')
+            logger.debug('Terminating zip process...')
             await proc.communicate()
-            logging.info('Zip process has been terminated')
+            logging.debug('Zip process has been terminated')
             raise web.HTTPBadRequest(text='Drop connection')
 
 
@@ -76,14 +79,26 @@ async def handle_index_page(_):
 
 
 def main():
+    global latency, photo_directory
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--directory', type=str)
+    parser.add_argument('-l', '--latency', type=float, default=0)
+    parser.add_argument("-v", "--verbose", nargs='?',
+                        const=True, default=False,
+                        help="Activate debug mode.")
+    parsed_args = parser.parse_args()
+    latency = parsed_args.latency
+    if parsed_args.directory:
+        photo_directory = parsed_args.directory
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        level=logging.INFO
+        level=logging.INFO,
+        datefmt='%Y-%m-%d %H:%M:%S',
     )
-    logger.setLevel(logging.INFO)
+    if parsed_args.verbose:
+        logger.setLevel(logging.DEBUG)
     logger.info('Working directory: %s', working_directory)
     app = web.Application()
-    aiohttp_debugtoolbar.setup(app)
     app.add_routes([
         web.get('/', handle_index_page),
         web.get('/archive/{archive_hash}/', archive),

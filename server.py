@@ -10,12 +10,8 @@ logger = logging.getLogger(__file__)
 
 
 async def archive(request):
-    response = web.StreamResponse()
-    response.enable_chunked_encoding()
     archive_hash = request.match_info.get('archive_hash')
-
     target_directory = request.app['working_directory'] + '/' + archive_hash
-    print(target_directory)
     if not os.path.exists(target_directory):
         logging.error(
             "Cannot access '%s': No such directory",
@@ -23,10 +19,11 @@ async def archive(request):
         )
         raise web.HTTPNotFound(text='Архив не существует или был удален')
 
+    response = web.StreamResponse()
+    response.enable_chunked_encoding()
     response.headers['Content-Type'] = 'application/octet-stream'
     response.headers['Content-Disposition'] = \
         'attachment; filename="photo_archive.zip"'
-
     await response.prepare(request)
 
     proc = await asyncio.create_subprocess_exec(
@@ -53,7 +50,6 @@ async def archive(request):
             logger.debug('Sending archive chunk %s bytes to length', len(data))
             await response.write(data)
             await asyncio.sleep(request.app['latency'])
-            print(request.app['latency'])
     except ConnectionResetError:
         logger.info('Download was interrupted')
     except SystemExit:
@@ -104,7 +100,7 @@ def main():
     logger.info('Working directory: %s', working_directory)
     app = web.Application()
     app['latency'] = parsed_args.latency
-    app['working_directory'] = parsed_args.directory
+    app['working_directory'] = working_directory
     app.add_routes([
         web.get('/', handle_index_page),
         web.get('/archive/{archive_hash}/', archive),

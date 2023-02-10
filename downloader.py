@@ -13,7 +13,7 @@ async def download(url, filename, pause_at=None, latency=0, delay=None):
             if resp.status == 200:
                 with open(filename, 'wb') as file_descriptor:
                     logger.info('Start downloading...')
-                    iteration_counter = 0
+                    iteration_counter = 1
                     async for chunk in resp.content.iter_any():
                         logger.debug('Iteration #%s', iteration_counter)
                         logger.debug(

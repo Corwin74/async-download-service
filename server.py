@@ -10,7 +10,7 @@ logger = logging.getLogger(__file__)
 
 
 async def archive(request):
-    archive_hash = request.match_info.get('archive_hash')
+    archive_hash = request.match_info['archive_hash']
     target_directory = request.app['working_directory'] + '/' + archive_hash
     if not os.path.exists(target_directory):
         logging.error(

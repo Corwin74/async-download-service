@@ -36,13 +36,7 @@ async def archive(request):
         cwd=target_directory,
     )
     try:
-        while not (proc.stdout.at_eof() and proc.returncode == 0):
-            if proc.stdout.at_eof():
-                logger.debug(
-                    'Receive eof, but zip process returncode: %s',
-                    proc.returncode
-                )
-                raise ConnectionResetError
+        while not proc.stdout.at_eof():
             data = await proc.stdout.read(1024*400)
             logger.debug('Sending archive chunk %s bytes to length', len(data))
             await response.write(data)
@@ -52,6 +46,12 @@ async def archive(request):
     except SystemExit:
         logger.error('System Exit exception')
     else:
+        if not proc.returncode == 0:
+            logger.debug(
+                'Receive eof, but zip process returncode: %s',
+                proc.returncode
+            )
+            raise ConnectionResetError
         logger.debug('Zip process exit status is OK')
         await response.write_eof()
         logger.info('Archive has been sent')

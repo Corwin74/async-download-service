@@ -7,6 +7,7 @@ import aiofiles
 
 
 logger = logging.getLogger(__file__)
+PHOTOS_DIRECTORY = '/test_photos'
 
 
 async def archive(request):
@@ -35,11 +36,7 @@ async def archive(request):
         cwd=target_directory,
     )
     try:
-        while True:
-            if proc.stdout.at_eof() and proc.returncode == 0:
-                await response.write_eof()
-                logger.debug('Zip process exit status is OK')
-                break
+        while not (proc.stdout.at_eof() and proc.returncode == 0):
             if proc.stdout.at_eof():
                 logger.debug(
                     'Receive eof, but zip process returncode: %s',
@@ -55,6 +52,8 @@ async def archive(request):
     except SystemExit:
         logger.error('System Exit exception')
     else:
+        logger.debug('Zip process exit status is OK')
+        await response.write_eof()
         logger.info('Archive has been sent')
         return response
     finally:
@@ -74,7 +73,7 @@ async def handle_index_page(_):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--directory', type=str, default='test_photos/')
+    parser.add_argument('-d', '--directory', type=str)
     parser.add_argument('-l', '--latency', type=float, default=1)
     parser.add_argument("-v", "--verbose", nargs='?',
                         const=True, default=False,
@@ -87,15 +86,12 @@ def main():
     )
     if parsed_args.verbose:
         logger.setLevel(logging.DEBUG)
-    working_directory = os.path.dirname(os.path.abspath(__file__))
-    if parsed_args.directory[0] == '/':
+    working_directory = os.path.dirname(os.path.abspath(__file__)) +\
+        PHOTOS_DIRECTORY
+    if parsed_args.directory:
         working_directory = parsed_args.directory
-    else:
-        working_directory += '/' + parsed_args.directory
-    if working_directory[-1] == '/':
-        working_directory = working_directory[:-1]
     if not os.path.exists(working_directory):
-        logger.error("%s not exist", working_directory)
+        logger.error("Directory '%s' not exist", working_directory)
         return
     logger.info('Working directory: %s', working_directory)
     app = web.Application()

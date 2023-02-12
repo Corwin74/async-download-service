@@ -8,6 +8,7 @@ import aiofiles
 
 logger = logging.getLogger(__file__)
 PHOTOS_DIRECTORY = '/test_photos'
+READ_CHUNK_SIZE = 300*1024
 
 
 async def archive(request):
@@ -37,7 +38,7 @@ async def archive(request):
     )
     try:
         while not proc.stdout.at_eof():
-            data = await proc.stdout.read(1024*400)
+            data = await proc.stdout.read(READ_CHUNK_SIZE)
             logger.debug('Sending archive chunk %s bytes to length', len(data))
             await response.write(data)
             await asyncio.sleep(request.app['latency'])
@@ -61,7 +62,7 @@ async def archive(request):
             proc.terminate()
             logger.debug('Terminating zip process...')
             await proc.communicate()
-            logging.debug('Zip process has been terminated')
+            logger.debug('Zip process has been terminated')
             raise web.HTTPBadRequest(text='Drop connection')
 
 

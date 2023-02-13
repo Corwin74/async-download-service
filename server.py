@@ -7,7 +7,7 @@ import aiofiles
 
 
 logger = logging.getLogger(__file__)
-PHOTOS_DIRECTORY = '/test_photos'
+PHOTOS_DIRECTORY = 'test_photos'
 READ_CHUNK_SIZE = 300*1024
 
 
@@ -87,8 +87,10 @@ def main():
     )
     if parsed_args.verbose:
         logger.setLevel(logging.DEBUG)
-    working_directory = os.path.dirname(os.path.abspath(__file__)) +\
-        PHOTOS_DIRECTORY
+    working_directory = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        PHOTOS_DIRECTORY,
+    )
     if parsed_args.directory:
         working_directory = parsed_args.directory
     if not os.path.exists(working_directory):

@@ -13,7 +13,7 @@ READ_CHUNK_SIZE = 300*1024
 
 async def archive(request):
     archive_hash = request.match_info['archive_hash']
-    target_directory = request.app['working_directory'] + '/' + archive_hash
+    target_directory = f"{request.app['working_directory']}/{archive_hash}"
     if not os.path.exists(target_directory):
         logging.error(
             "Cannot access '%s': No such directory",
@@ -52,7 +52,7 @@ async def archive(request):
                 'Receive eof, but zip process returncode: %s',
                 proc.returncode
             )
-            raise ConnectionResetError
+            raise web.HTTPServerError()
         logger.debug('Zip process exit status is OK')
         await response.write_eof()
         logger.info('Archive has been sent')
@@ -61,6 +61,7 @@ async def archive(request):
         if proc.returncode is None:
             proc.kill()
             logger.debug('Killing zip process...')
+            await proc.communicate()
             raise web.HTTPBadRequest(text='Drop connection')
 
 

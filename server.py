@@ -59,10 +59,8 @@ async def archive(request):
         return response
     finally:
         if proc.returncode is None:
-            proc.terminate()
-            logger.debug('Terminating zip process...')
-            await proc.communicate()
-            logger.debug('Zip process has been terminated')
+            proc.kill()
+            logger.debug('Killing zip process...')
             raise web.HTTPBadRequest(text='Drop connection')
 
 
